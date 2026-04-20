@@ -1,3 +1,5 @@
+import { drawBackground, drawGameObject, drawScore, type RenderKind } from "./renderer.js";
+
 abstract class GameObject {
 
     active = true;
@@ -13,12 +15,50 @@ abstract class GameObject {
         this.w = w;
         this.h = h;
     }
+
+    intersectes(other: GameObject) {
+
+        return (
+            this.x < other.x + other.w &&
+            this.x + this.w > other.x &&
+            this.y < other.y + other.h &&
+            this.y + this.h > other.y
+        )
+    }
+
     abstract draw(ctx: CanvasRenderingContext2D): void;
     abstract update(): void;
 
 }
 
+export class Score extends GameObject {
+    private points = 0;
+    private readonly margin = 16;
+
+    constructor(private screenWidth: number, y = 24) {
+        super(screenWidth - 16, y, 0, 0);
+    }
+
+    setPoints(points: number): void {
+        this.points = points;
+    }
+
+    addPoints(points = 1): void {
+        this.points += points;
+    }
+
+    update(): void {
+        // Keep score anchored to top-right when canvas size changes.
+        this.x = this.screenWidth - this.margin;
+    }
+
+    draw(ctx: CanvasRenderingContext2D): void {
+        drawScore(ctx, this.points, this.x, this.y);
+    }
+}
+
 class Bullet extends GameObject {
+    private readonly renderKind: RenderKind = "bullet";
     speed: number = 10;
 
     constructor(x: number, y: number) {
@@ -34,32 +74,31 @@ class Bullet extends GameObject {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
-        ctx.fillStyle = "#222"
-        ctx.fillRect(this.x, this.y, 5, 10)
+        drawGameObject(ctx, this.renderKind, this.x, this.y, this.w, this.h);
     }
 }
 
 
 class Bird extends GameObject {
+    private readonly renderKind: RenderKind = "bird";
     constructor(
         x: number,
         y: number,
         private speed: number,
         private screenWidth: number
     ) {
-        super(x, y, 30, 20)
+        super(x, y, 44, 30)
     }
 
     update(): void {
         this.x += this.speed
-        if (this.x > this.screenWidth - 10) {
+        if (this.x > this.screenWidth) {
             this.active = false
         }
     }
 
     draw(ctx: CanvasRenderingContext2D): void {
-        ctx.fillStyle = "#5a67d8"
-        ctx.fillRect(this.x, this.y, this.w, this.h)
+        drawGameObject(ctx, this.renderKind, this.x, this.y, this.w, this.h);
     }
 }
 
@@ -101,6 +140,7 @@ export class BirdGenerator extends GameObject {
 }
 
 export class Gun extends GameObject {
+    private readonly renderKind: RenderKind = "gun";
     private sm: ScreenManager;
     private dx: number;
 
@@ -114,8 +154,7 @@ export class Gun extends GameObject {
     }
 
     draw(ctx: CanvasRenderingContext2D): void {
-        ctx.fillStyle = "#e53e3e"
-        ctx.fillRect(this.x, this.y, this.w, this.h)
+        drawGameObject(ctx, this.renderKind, this.x, this.y, this.w, this.h);
     }
 
     moveRight(): void {
@@ -160,22 +199,23 @@ export class ScreenManager {
 
         const bullets = this.objects.filter((obj) => obj instanceof Bullet) as Bullet[]
         const birds = this.objects.filter((obj) => obj instanceof Bird) as Bird[]
+        const score = this.objects.find((obj) => obj instanceof Score) as Score | undefined
 
         for (const bullet of bullets) {
             for (const bird of birds) {
-                if (this.isColliding(bullet, bird)) {
+
+                if (bullet.intersectes(bird)) {
                     bullet.active = false
                     bird.active = false
+                    score?.addPoints(1)
                 }
-
+            }
             }
 
         }
 
-    }
-
-    update(): void {
-        for (const obj of this.objects) {
+        update(): void {
+            for(const obj of this.objects) {
             obj.update();
         }
         this.handleCollisions()
@@ -185,9 +225,7 @@ export class ScreenManager {
 
 
     render(): void {
-        this.ctx.clearRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
-        this.ctx.fillStyle = "#f7fafc"
-        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height)
+        drawBackground(this.ctx, this.ctx.canvas.width, this.ctx.canvas.height);
 
         for (const obj of this.objects) {
             obj.draw(this.ctx);
