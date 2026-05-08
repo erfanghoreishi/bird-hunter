@@ -170,26 +170,53 @@ export class Game {
     constructor(sm, gun) {
         this.sm = sm;
         this.gun = gun;
+        this.moveCounter = 10; // Start at 10 so first move happens immediately
+        this.MOVE_INTERVAL = 10;
+        this.keysPressed = {};
         window.addEventListener("keydown", (e) => {
-            if (e.repeat)
-                return; // One action per physical key press
-            if (e.key === "ArrowLeft") {
+            // For arrow keys, move immediately on first press, then track as held
+            if (e.key === "ArrowLeft" && !e.repeat) {
                 this.gun.moveLeft();
+                this.keysPressed["ArrowLeft"] = true;
+            }
+            if (e.key === "ArrowRight" && !e.repeat) {
+                this.gun.moveRight();
+                this.keysPressed["ArrowRight"] = true;
+            }
+            // Space bar always shoots immediately
+            if (e.key === " " && !e.repeat) {
+                this.gun.shoot();
+            }
+        });
+        window.addEventListener("keyup", (e) => {
+            // Mark keys as released
+            if (e.key === "ArrowLeft") {
+                this.keysPressed["ArrowLeft"] = false;
             }
             if (e.key === "ArrowRight") {
-                this.gun.moveRight();
-            }
-            if (e.key === " ") {
-                this.gun.shoot();
+                this.keysPressed["ArrowRight"] = false;
             }
         });
     }
     start() {
         const loop = () => {
+            this.handleContinuousMovement();
             this.sm.update();
             this.sm.render();
             requestAnimationFrame(loop);
         };
         requestAnimationFrame(loop);
+    }
+    handleContinuousMovement() {
+        this.moveCounter++;
+        if (this.moveCounter >= this.MOVE_INTERVAL) {
+            this.moveCounter = 0;
+            if (this.keysPressed["ArrowLeft"]) {
+                this.gun.moveLeft();
+            }
+            if (this.keysPressed["ArrowRight"]) {
+                this.gun.moveRight();
+            }
+        }
     }
 }
